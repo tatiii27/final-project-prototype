@@ -203,7 +203,6 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
 
 
 /* =======================================
-/* =======================================
  * PART B: EXPLORE GLOBE (BOTTOM)
  * =====================================*/
 (function exploreGlobe() {
@@ -248,29 +247,53 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
 
   const countriesLayer = svg.append("g").attr("id", "explore-countries");
 
+  // Controls & legend
   const metricSelect = document.getElementById("metric-select");
-  const yearSlider = document.getElementById("year-slider");
-  const yearLabel = document.getElementById("year-label");
+  const decadeSelect = document.getElementById("decade-select");
   const legendMin = document.getElementById("legend-min");
   const legendMax = document.getElementById("legend-max");
+  const legendBar = document.querySelector("#legend-explore .legend-bar");
+  const countryStatsEl = document.getElementById("country-stats");
 
-  if (!metricSelect || !yearSlider || !yearLabel || !legendMin || !legendMax) {
-    console.warn("Explore controls missing, skipping explore globe.");
+  if (
+    !metricSelect ||
+    !decadeSelect ||
+    !legendMin ||
+    !legendMax ||
+    !legendBar ||
+    !countryStatsEl
+  ) {
+    console.warn("Explore controls, legend, or stats panel missing, skipping explore globe.");
     return;
   }
 
-  const colorScale = d3.scaleSequential(d3.interpolateViridis);
+  // ✨ Elegant color scale for navy background
+  // Deep blue -> teal -> warm gold
+  const elegantInterpolator = t =>
+    d3.interpolateRgbBasis(["#15254b", "#3f8abf", "#f6d365"])(t);
+
+  const colorScale = d3.scaleSequential(elegantInterpolator);
 
   let countries = [];
-  let dataByCodeYear = null;
+  let dataByNameDecade = null;  // 🔑 keyed by Country Name, not Country Code
   let metricColumns = [];
-  let years = [];
+  let decades = [];
   let currentMetric = null;
-  let currentYear = null;
+  let currentDecade = null;
 
-  // 1️⃣ ALWAYS load world + draw countries (even if CSV fails)
+  // Map year -> decade label like "1970-1979"
+  function decadeLabelFromYear(year) {
+    if (year == null || isNaN(year)) return null;
+    if (year < 1970) return null; // ignore pre-1970 for the UI
+    const start = Math.floor(year / 10) * 10;
+    const end = start + 9;
+    return `${start}-${end}`;
+  }
+
+  // 1️⃣ Always load world + draw countries first
   d3.json(WORLD_URL)
     .then(world => {
+      // TopoJSON → GeoJSON
       countries = topojson.feature(world, world.objects.countries).features;
       console.log("Explore globe: countries loaded:", countries.length);
 
@@ -280,15 +303,16 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
         .join("path")
         .attr("class", "country")
         .attr("d", path)
-        .attr("fill", "#444f7a")    // base color
+        .attr("fill", "#444f7a")    // base color before data
         .attr("stroke", "white")
-        .attr("stroke-width", 0.3);
+        .attr("stroke-width", 0.3)
+        .on("click", (event, d) => onCountryClick(d));  // ⭐ click handler
 
       addDrag();
       startRotation();
       render();
 
-      // 2️⃣ Then try loading gender.csv for choropleth
+      // 2️⃣ Then load gender.csv to build the decade-based choropleth
       loadGenderData();
     })
     .catch(err => {
@@ -296,17 +320,27 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
     });
 
   function loadGenderData() {
-    d3.csv("gender.csv", d3.autoType)
+    d3.csv("data/gender.csv", d3.autoType)
       .then(data => {
         console.log("Explore globe: gender.csv rows:", data.length);
 
-        dataByCodeYear = d3.rollup(
-          data,
+        // Attach decade label to each row (only from 1970+)
+        const filtered = data
+          .map(d => {
+            const decLabel = decadeLabelFromYear(d.Year);
+            return decLabel ? { ...d, Decade: decLabel } : null;
+          })
+          .filter(d => d !== null);
+
+        // 🔑 Rollup: Country Name -> Decade -> rows
+        dataByNameDecade = d3.rollup(
+          filtered,
           v => v,
-          d => d["Country Code"],  // e.g. "USA", "FRA"
-          d => d.Year
+          d => d["Country Name"],  // <-- USING Country Name
+          d => d.Decade
         );
 
+        // Metric columns
         metricColumns = data.columns.filter(c => c.startsWith("average_value_"));
         if (!metricColumns.length) {
           console.warn("No metric columns starting with 'average_value_' in gender.csv");
@@ -319,19 +353,28 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
 
         currentMetric = preferredMetric;
 
-        years = Array.from(new Set(data.map(d => d.Year))).sort(d3.ascending);
-        currentYear = years[years.length - 1];
+        // Decades present in the data (1970+), sorted chronologically
+        decades = Array.from(
+          new Set(filtered.map(d => d.Decade))
+        ).sort((a, b) => {
+          const aStart = parseInt(a.split("-")[0], 10);
+          const bStart = parseInt(b.split("-")[0], 10);
+          return aStart - bStart;
+        });
+
+        currentDecade = decades[decades.length - 1]; // latest decade
 
         setupControls();
         updateChoropleth();
       })
       .catch(err => {
         console.error("Explore globe gender.csv load error:", err);
-        // If CSV fails, we still keep the plain blue globe.
+        // If CSV fails, we still keep the plain globe.
       });
   }
 
   function setupControls() {
+    // Metric dropdown
     metricSelect.innerHTML = "";
     metricColumns.forEach(col => {
       const opt = document.createElement("option");
@@ -339,24 +382,28 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
       opt.textContent = prettyMetricLabel(col);
       metricSelect.appendChild(opt);
     });
-
     if (currentMetric) metricSelect.value = currentMetric;
 
     metricSelect.addEventListener("change", () => {
       currentMetric = metricSelect.value;
       updateChoropleth();
+      clearCountryStats(false);
     });
 
-    yearSlider.min = 0;
-    yearSlider.max = years.length - 1;
-    yearSlider.value = years.indexOf(currentYear);
-    yearLabel.textContent = currentYear;
+    // Decade dropdown
+    decadeSelect.innerHTML = "";
+    decades.forEach(dec => {
+      const opt = document.createElement("option");
+      opt.value = dec;
+      opt.textContent = dec; // e.g. "1970-1979"
+      decadeSelect.appendChild(opt);
+    });
+    if (currentDecade) decadeSelect.value = currentDecade;
 
-    yearSlider.addEventListener("input", () => {
-      const idx = +yearSlider.value;
-      currentYear = years[idx];
-      yearLabel.textContent = currentYear;
+    decadeSelect.addEventListener("change", () => {
+      currentDecade = decadeSelect.value;
       updateChoropleth();
+      clearCountryStats(false);
     });
   }
 
@@ -413,11 +460,12 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
     countriesLayer.selectAll("path.country").attr("d", path);
   }
 
-  function getValue(countryCode, year, metric) {
-    if (!countryCode || !metric || !dataByCodeYear) return null;
-    const byYear = dataByCodeYear.get(countryCode);
-    if (!byYear) return null;
-    const rows = byYear.get(year);
+  // Get metric value for a given country-name + decade (average across all years in that decade)
+  function getValue(countryName, decade, metric) {
+    if (!countryName || !metric || !dataByNameDecade) return null;
+    const byDecade = dataByNameDecade.get(countryName);
+    if (!byDecade) return null;
+    const rows = byDecade.get(decade);
     if (!rows || !rows.length) return null;
 
     const vals = rows
@@ -429,43 +477,130 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
   }
 
   function updateChoropleth() {
-    if (!countries.length || !currentMetric || !dataByCodeYear) return;
+    if (!countries.length || !currentMetric || !currentDecade || !dataByNameDecade) return;
 
     const vals = [];
     countries.forEach(d => {
-      const code =
-        d.id ||
-        d.properties.iso3 ||
-        d.properties.ISO3 ||
-        d.properties.iso_a3;
-      const v = getValue(code, currentYear, currentMetric);
+      const name = d.properties && d.properties.name;
+      if (!name) return;
+      const v = getValue(name, currentDecade, currentMetric);
       if (v != null && !isNaN(v)) vals.push(v);
     });
 
     if (!vals.length) {
-      console.warn("No data values for this metric/year.");
+      console.warn("No data values for metric", currentMetric, "decade", currentDecade);
       return;
     }
 
     const extent = d3.extent(vals);
     colorScale.domain(extent);
 
+    // 🗺️ Color countries
     countriesLayer
       .selectAll("path.country")
       .attr("fill", d => {
-        const code =
-          d.id ||
-          d.properties.iso3 ||
-          d.properties.ISO3 ||
-          d.properties.iso_a3;
-        const v = getValue(code, currentYear, currentMetric);
+        const name = d.properties && d.properties.name;
+        if (!name) return "#444f7a";
+        const v = getValue(name, currentDecade, currentMetric);
         if (v == null || isNaN(v)) return "#444f7a"; // fallback color
         return colorScale(v);
       });
 
-    legendMin.textContent = d3.format(".2f")(extent[0]);
-    legendMax.textContent = d3.format(".2f")(extent[1]);
+    // 🔢 Legend labels
+    const format = d3.format(".2f");
+    legendMin.textContent = format(extent[0]);
+    legendMax.textContent = format(extent[1]);
+
+    // 🎨 Legend gradient that matches the colorScale + navy background
+    const [min, max] = extent;
+    const stopsCount = 7;
+    const stops = d3.range(stopsCount).map(i => {
+      const t = i / (stopsCount - 1);             // 0 → 1
+      const value = min + t * (max - min);        // map to [min, max]
+      return colorScale(value);
+    });
+
+    legendBar.style.backgroundImage =
+      `linear-gradient(to right, ${stops.join(",")})`;
 
     render();
+  }
+
+  /* ===== Click handler to show stats ===== */
+
+  function onCountryClick(feature) {
+    if (!dataByNameDecade || !currentMetric || !currentDecade) {
+      clearCountryStats(true, "Data not loaded yet.");
+      return;
+    }
+
+    const name = feature.properties && feature.properties.name
+      ? feature.properties.name
+      : "Unknown country";
+
+    const byDec = dataByNameDecade.get(name);
+    if (!byDec) {
+      clearCountryStats(true, `No data for ${name} in ${currentDecade}.`);
+      return;
+    }
+
+    const rows = byDec.get(currentDecade);
+    if (!rows || !rows.length) {
+      clearCountryStats(true, `No data for ${name} in ${currentDecade}.`);
+      return;
+    }
+
+    const metricLabel = prettyMetricLabel(currentMetric);
+    const vals = rows
+      .map(r => r[currentMetric])
+      .filter(v => v != null && !isNaN(v));
+
+    if (!vals.length) {
+      clearCountryStats(
+        true,
+        `No numeric values for ${metricLabel} in ${name}, ${currentDecade}.`
+      );
+      return;
+    }
+
+    const format = d3.format(".2f");
+    const avg = d3.mean(vals);
+    const min = d3.min(vals);
+    const max = d3.max(vals);
+    const years = Array.from(new Set(rows.map(r => r.Year))).sort((a, b) => a - b);
+
+    const html = `
+      <div class="country-stats-header">
+        <div class="country-stats-name">${name}</div>
+        <div class="country-stats-decade">${currentDecade}</div>
+      </div>
+      <div class="country-stats-metric">${metricLabel}</div>
+
+      <div class="country-stats-value-row">
+        <span class="country-stats-label">Average:</span>
+        <span class="country-stats-value">${format(avg)}</span>
+      </div>
+      <div class="country-stats-value-row">
+        <span class="country-stats-label">Range:</span>
+        <span class="country-stats-value">${format(min)} – ${format(max)}</span>
+      </div>
+
+      <div class="country-stats-notes">
+        Based on ${years.length} year(s) of data: ${years.join(", ")}.
+      </div>
+    `;
+
+    countryStatsEl.classList.remove("country-stats--empty");
+    countryStatsEl.innerHTML = html;
+  }
+
+  function clearCountryStats(showPlaceholder = true, message = null) {
+    if (!showPlaceholder) return;
+    countryStatsEl.classList.add("country-stats--empty");
+    countryStatsEl.innerHTML = `
+      <p class="country-stats-placeholder">
+        ${message || "Click on a country to see its decade-average stats."}
+      </p>
+    `;
   }
 })();

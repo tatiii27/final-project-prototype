@@ -93,6 +93,16 @@
 
     </section>
 
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+
     <!-- BOTTOM: EXPLORE GLOBE -->
     <section class="explore">
       <h2>Explore the Data Yourself</h2>
@@ -101,31 +111,43 @@
       </p>
 
       <div class="explore-controls">
-        <div class="control-group">
-          <label for="metric-select">Metric</label>
-          <select id="metric-select"></select>
-        </div>
+  <div class="control-group">
+    <label for="metric-select">Metric</label>
+    <select id="metric-select"></select>
+  </div>
 
-        <div class="control-group">
-          <label for="year-slider">
-            Year: <span id="year-label"></span>
-          </label>
-          <input type="range" id="year-slider" min="0" max="10" value="0" step="1" />
-        </div>
+  <div class="control-group">
+    <label for="decade-select">
+      Decade
+    </label>
+    <select id="decade-select"></select>
+  </div>
+</div>
+
+      <section id="globe-explore-section">
+  </p>
+
+  <div id="globe-explore-container">
+    <svg id="globe-explore"></svg>
+
+    <div id="legend-explore">
+      <div class="legend-title">Metric scale</div>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span id="legend-min">–</span>
+        <span id="legend-max">–</span>
       </div>
+    </div>
+  </div>
 
-      <div id="globe-explore-container">
-        <svg id="globe-explore"></svg>
+  <!-- ⭐ NEW: country stats panel -->
+  <div id="country-stats" class="country-stats country-stats--empty">
+    <p class="country-stats-placeholder">
+      Click on a country to see its decade-average stats.
+    </p>
+  </div>
+</section>
 
-        <div id="legend-explore">
-          <div class="legend-title">Metric scale</div>
-          <div class="legend-bar"></div>
-          <div class="legend-labels">
-            <span id="legend-min">–</span>
-            <span id="legend-max">–</span>
-          </div>
-        </div>
-      </div>
     </section>
   </div>
 
