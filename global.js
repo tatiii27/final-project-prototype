@@ -267,15 +267,20 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
     return;
   }
 
-  // ✨ Elegant color scale for navy background
-  // Deep blue -> teal -> warm gold
-  const elegantInterpolator = t =>
-    d3.interpolateRgbBasis(["#15254b", "#3f8abf", "#f6d365"])(t);
+  // ✨ Elegant color scale for navy background:
+  // deep navy → teal → warm gold
+const elegantInterpolator = t =>
+  d3.interpolateRgbBasis([
+    "#f28e84", // soft coral
+    "#f2d675",  // gold
+    "#18a6a6",   // teal    
+  ])(t);
+
 
   const colorScale = d3.scaleSequential(elegantInterpolator);
 
   let countries = [];
-  let dataByNameDecade = null;  // 🔑 keyed by Country Name, not Country Code
+  let dataByNameDecade = null;  // 🔑 keyed by Country Name
   let metricColumns = [];
   let decades = [];
   let currentMetric = null;
@@ -293,7 +298,6 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
   // 1️⃣ Always load world + draw countries first
   d3.json(WORLD_URL)
     .then(world => {
-      // TopoJSON → GeoJSON
       countries = topojson.feature(world, world.objects.countries).features;
       console.log("Explore globe: countries loaded:", countries.length);
 
@@ -336,7 +340,7 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
         dataByNameDecade = d3.rollup(
           filtered,
           v => v,
-          d => d["Country Name"],  // <-- USING Country Name
+          d => d["Country Name"],
           d => d.Decade
         );
 
@@ -495,7 +499,7 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
     const extent = d3.extent(vals);
     colorScale.domain(extent);
 
-    // 🗺️ Color countries
+    // 🗺️ Color countries using the metric scale
     countriesLayer
       .selectAll("path.country")
       .attr("fill", d => {
@@ -511,12 +515,12 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
     legendMin.textContent = format(extent[0]);
     legendMax.textContent = format(extent[1]);
 
-    // 🎨 Legend gradient that matches the colorScale + navy background
+    // 🎨 Legend gradient that matches the colorScale
     const [min, max] = extent;
     const stopsCount = 7;
     const stops = d3.range(stopsCount).map(i => {
-      const t = i / (stopsCount - 1);             // 0 → 1
-      const value = min + t * (max - min);        // map to [min, max]
+      const t = i / (stopsCount - 1);      // 0 → 1
+      const value = min + t * (max - min); // map to [min, max]
       return colorScale(value);
     });
 

@@ -110,13 +110,14 @@ body {
 
 .country {
   cursor: pointer;
-  fill: #374760;
+  /* let D3 control the base color */
   transition: stroke-width 0.15s ease, stroke 0.15s ease, opacity 0.15s ease;
 }
 
 .country:hover {
   stroke-width: 0.8;
   opacity: 0.95;
+  /* optional: keep a subtle hover tint, or remove this line if you want pure data colors */
   fill: #4a5a7a;
 }
 
@@ -495,7 +496,7 @@ body {
 
 .country-stats-value {
   font-weight: 600;
-  color: #ffdd7b;
+  color: #4f7cff;
 }
 
 .country-stats-notes {
