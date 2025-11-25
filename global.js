@@ -126,13 +126,18 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
       if (isDragging) return; // dragging overrides scroll
 
       const scrollY = window.scrollY + window.innerHeight * 0.5;
+      const lastIdx = stepTops.length - 1;
       let idx = 0;
 
-      // find which two steps we are between
-      for (let i = 0; i < stepTops.length - 1; i++) {
-        if (scrollY >= stepTops[i] && scrollY < stepTops[i + 1]) {
-          idx = i;
-          break;
+      if (scrollY >= stepTops[lastIdx]) {
+        idx = lastIdx; // past the final step
+      } else {
+        // find which two steps we are between
+        for (let i = 0; i < stepTops.length - 1; i++) {
+          if (scrollY >= stepTops[i] && scrollY < stepTops[i + 1]) {
+            idx = i;
+            break;
+          }
         }
       }
 
@@ -148,7 +153,13 @@ const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.jso
       const startRot = [-startFrame.coords[0], -startFrame.coords[1]];
       const endRot   = [-endFrame.coords[0], -endFrame.coords[1]];
 
-      const rInterp = d3.interpolate(startRot, endRot);
+      // Avoid the long way round when crossing the dateline (e.g., N. America → Oceania)
+      let adjustedEnd = endRot.slice();
+      const lonDiff = adjustedEnd[0] - startRot[0];
+      if (lonDiff > 180) adjustedEnd[0] -= 360;
+      if (lonDiff < -180) adjustedEnd[0] += 360;
+
+      const rInterp = d3.interpolate(startRot, adjustedEnd);
       rotation = rInterp(d3.easeCubicInOut(t));
 
       projection.rotate(rotation);
