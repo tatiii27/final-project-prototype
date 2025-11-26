@@ -565,3 +565,61 @@ body {
   opacity: 0;
   transition: opacity 0.15s ease;
 }
+
+/* graphs next to globes */
+.region-step {
+  margin-bottom: 80px;
+}
+.region-summary {
+  max-width: 32rem;
+  color: #cbd5f5;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+.region-periods {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.region-period h3 {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.period-caption {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.mini-chart {
+  background: radial-gradient(circle at top left, #111827 0, #020617 55%, #020617 100%);
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.mini-chart svg {
+  width: 100%;
+  height: auto;
+}
+
+.metric-label {
+  fill: #e5e7eb;
+  font-size: 11px;
+}
+
+.bar-girls {
+  fill: #fb7185;
+}
+
+.bar-boys {
+  fill: #60a5fa;
+}
+
+
+.story-tooltip {
+  z-index: 9999;
+}
